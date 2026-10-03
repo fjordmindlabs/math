@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use this certificate or the method, please cite it as below."
+title: "erdos647-sparse: a kernel-checked exclusion for Erdős Problem 647 to 10^13 via in-kernel modular rungs and a sparse witness walk"
+authors:
+  - family-names: "Tölö"
+    given-names: "Eero"
+    affiliation: "Fjordmind Labs"
+    email: "labs@fjordmind.no"
+type: software
+version: "0.1.0"
+date-released: "2026-10-03"
+repository-code: "https://github.com/fjordmindlabs/math"
+license: Apache-2.0
+keywords:
+  - "Erdős problems"
+  - "Lean 4"
+  - "formal verification"
+  - "number theory"
+  - "certificate checking"
+references:
+  - type: article
+    title: "A Kernel-Checked Exclusion Certificate for Erdős Problem 647"
+    authors:
+      - family-names: "Mian"
+        given-names: "Ibrahim"
+      - family-names: "Siddique"
+        given-names: "Shayaan"
+    year: 2026
+    identifiers:
+      - type: other
+        value: "arXiv:2608.17880"
+    url: "https://arxiv.org/abs/2608.17880"
+    repository-code: "https://github.com/ibrahimmian36/decanus"

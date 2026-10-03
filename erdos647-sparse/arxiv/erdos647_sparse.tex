@@ -1,0 +1,150 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1.1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+\hypersetup{colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black}
+\newcommand{\tauf}{\tau}
+\newcommand{\Cand}{\mathrm{Cand}}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+
+\title{A Kernel-Checked Exclusion for Erd\H{o}s Problem 647 to $10^{13}$\\
+\large via modular rungs proved inside the kernel and a sparse witness walk}
+\author{Eero T\"ol\"o\\ Fjordmind Labs\\ \texttt{labs@fjordmind.no}}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Erd\H{o}s Problem 647 asks whether any $n>24$ satisfies $\max_{m<n}\,(m+\tau(m))\le n+2$, where $\tau$ is the divisor-count function. The largest range excluded end to end by a proof kernel was $(24,10^{9}]$ (Mian--Siddique, \emph{decanus}), via a contiguous chain of $6.7$ million factorization witnesses that the authors describe as at the ceiling of the representation. We extend the kernel-checked exclusion to $(24,10^{13}]$, a $10{,}000\times$ larger range, with a \emph{smaller} certificate: $866{,}484$ witnesses in about $21$\,MB of Lean source. The gain comes from proving the structural reduction inside the kernel first: four modular ``rungs'', proved in Lean~4 without \texttt{native\_decide}, force $360360\mid n$ for every candidate $n>10^{5}$ and confine $(n \bmod 17,19,23,29)$ to $4{,}431$ of $215{,}441$ residue classes for $n>10^{11}$. Only the surviving grid points then need a witness, and each needs one. The resulting theorem is stated in the vocabulary of the public formal statement and has axiom closure exactly $\{\texttt{propext},\texttt{Classical.choice},\texttt{Quot.sound}\}$. No new mathematics is claimed: the rungs re-derive, kernel-clean, a residue reduction previously verified only with \texttt{native\_decide}. The contribution is the certificate architecture, together with a cost model showing where this family of methods stops: a kernel-checked horizon of $10^{17}$--$10^{18}$, not the $10^{22}$ unverified GPU frontier.
+\end{abstract}
+
+\section{Introduction}
+
+Let $\tau(m)$ denote the number of divisors of $m$. Problem 647 in Bloom's database of Erd\H{o}s problems (Erd\H{o}s--Selfridge) asks whether some $n>24$ satisfies
+\[
+\max_{m<n}\bigl(m+\tau(m)\bigr)\le n+2 .
+\]
+The condition holds at $n=24$ and the problem is open. Computational exclusions reach $10^{12}$ by direct sieve (Id\'en), about $6.2\times10^{17}$ via Hughes's modular reduction (Lean plus \texttt{native\_decide}, residue classes searched on a GPU), about $9.2\times10^{18}$ (bentrd), and $10^{22}$ (GPU with CRT lifting, 2026). None of these is checked by a proof kernel. Mian and Siddique~\cite{decanus} gave the first kernel-checked exclusion, at $10^{9}$, and framed the natural next step as ``structure rather than length'': certify the modular reduction inside the kernel so that only surviving classes need witnesses. This note does that.
+
+\paragraph{Result.}
+\[
+\texttt{erdos647\_no\_solution\_upto\_1e13} :\ \forall\, n:\mathbb{N},\ 24<n \to n\le 10^{13} \to \neg\Bigl(\bigsqcup_{m:\mathrm{Fin}\,n} (m+\sigma_0\, m) \le n+2\Bigr)
+\]
+(The Lean source states the bound as the literal \texttt{10000000000000}; the file \texttt{Erdos647Sparse/Headline13.lean} in the repository has the exact text.)
+Lean 4.30.0 / Mathlib v4.30.0; \verb|#print axioms| reports \verb|[propext, Classical.choice, Quot.sound]|. The inner predicate is the one pinned by decanus from \texttt{google-deepmind/formal-conjectures} (\texttt{ErdosProblems/647.lean}, commit \texttt{c252a41}), so the theorem speaks the public formal statement's vocabulary and composes with the decanus rung theorems. Source, certificates, generators and verification record: \url{https://github.com/fjordmindlabs/math} (directory \texttt{erdos647-sparse}).
+
+\paragraph{Trust tier.} As in decanus, this is a certification result, not a computational record; the range is nine orders of magnitude below the largest unverified computation. The claim is that every step from $24$ to $10^{13}$---the divisibility forced by each rung, the residue sieve, the divisor bound of every witness, the primality of every listed factor, and the gapless coverage of the surviving grid---is checked by the Lean kernel.
+
+\paragraph{Contributions.}
+\begin{enumerate}
+\item \emph{Kernel-clean modular rungs} (\S\ref{sec:rungs}): $2520\mid n$ ($n>1800$), $360360\mid n$ ($n>10^{5}$), a $41$-class survivor list for $(n\bmod 17,n\bmod 19)$ ($n>2.5\times10^{8}$), and a $4{,}431$-class survivor list for $(n\bmod 17,19,23,29)$ ($n>10^{11}$). The $41$-class list is an independent re-derivation of Hughes's reduction mod $46189$ with the \texttt{native\_decide} trust removed.
+\item \emph{Rungs as certificate lists, not tactic proofs} (\S\ref{sec:rung4}): the $22{,}916$ class kills of the fourth rung are data checked by chunked \texttt{decide} under one generic soundness lemma, the same shape as the witness certificate.
+\item \emph{A sparse-walk certificate} (\S\ref{sec:walk}): one witness per surviving grid point; $866{,}484$ witnesses over $(10^{7},10^{13}]$ versus $6{,}685{,}922$ for decanus's contiguous $(24,10^{9}]$.
+\item \emph{Engineering for kernel scale} (\S\ref{sec:eng}): bitmask residue filters, chunk sizing from measured superlinear fuel cost, and a balanced binary-split driver after a linear \texttt{by\_cases} ladder went quadratic at $1{,}525$ chunks.
+\item \emph{A scaling analysis} (\S\ref{sec:limits}): what deeper rungs buy, a structural argument that no prime $\ge17$ is ever fully forced by this method, and a cost curve to $10^{22}$.
+\end{enumerate}
+
+\section{The divisor-budget engine}
+
+Write $\Cand(n)$ for $\forall m<n,\ m+\tau(m)\le n+2$. We proved \texttt{sup\_iff\_cand}: $\Cand(n)\iff\bigl(\bigsqcup_{m:\mathrm{Fin}\,n} m+\sigma_0 m\le n+2\bigr)$ (forward via \texttt{le\_ciSup} over the finite range, backward via \texttt{ciSup\_le}, with $n=0$ by \texttt{ciSup\_of\_empty}), so all internal work is on $\Cand$.
+
+The single engine behind every rung is the \emph{divisor budget}: $\Cand(n)$ gives, for every shift $1\le k\le n$, $\tau(n-k)\le k+2$. If $m=d\cdot t$ with $d<t$ then $\tau(m)\ge2\tau(d)$, since the divisors of $d$ and their $t$-multiples are disjoint by size (\texttt{two\_mul\_tau\_le}). Hence:
+
+\begin{lemma}[\texttt{rung}]\label{lem:rung}
+If $\Cand(n)$, $k\ge1$, $d\mid n-k$ and $d^{2}<n-k$, then $2\tau(d)\le k+2$.
+\end{lemma}
+
+Contrapositively, a shift $k$ whose forced divisor $d$ of $n-k$ satisfies $2\tau(d)\ge k+3$ kills $n$. Every rung is a table of (residue class, shift $k$, forced divisor $d$) with $2\tau(d)\ge k+3$; all tables were enumerated and verified in Python first and then generated as Lean.
+
+\section{The modular rungs}\label{sec:rungs}
+
+\paragraph{Rung 1: $2520\mid n$ for $n>1800$ (\texttt{mod2520\_of\_cand}).}
+For each nonzero residue of $n$ modulo $8,3,9,5,7$ there is a shift $k\le6$ at which already-established divisibilities stack into some $d\in\{4,8,6,12,9,18,5,10,15,20,7,14,21,28,35,42\}$ with $2\tau(d)>k+2$. One uniform case per residue, closed by \texttt{omega}; the largest \texttt{decide} is $\tau(42)=8$.
+
+\paragraph{Rung 2: $360360\mid n$ ($n>10^{5}$) and $41$ survivor classes mod $17\cdot19$ ($n>2.5\times10^{8}$).}
+With $2520\mid n$, every nonzero residue mod $11$ and mod $13$ dies at some shift $k\le24$ where $\gcd(2520,k)$ stacks with $11$ or $13$ (tight cases: $r\equiv7\pmod{11}$ at $k=18$, $d=198$; $r\equiv7\pmod{13}$ at $k=20$, $d=260$; $r\equiv11\pmod{13}$ at $k=24$, $d=312$). Mod $17$ and mod $19$ do not fully eliminate: per-prime survivors are $\{0,11,13,14,15,16\}$ mod $17$ and $\{0,7,11,13,14,15,16,17\}$ mod $19$ ($48$ pairs), of which $7$ die only to joint shifts where $17\cdot19=323$ enters one divisor (largest $d=14535$ at $k=45$). The $41$ survivors equal, under $2520\equiv4\pmod{17}$, $\equiv12\pmod{19}$, the $41$ classes of $N=n/2520 \bmod 46189$ in Hughes's reduction, derived independently and kernel-clean. The threshold $2.5\times10^{8}$ is $14535^{2}$ rounded.
+
+\paragraph{Rung 4: $4{,}431$ survivor classes mod $17\cdot19\cdot23\cdot29$ ($n>10^{11}$).}\label{sec:rung4}
+(The development numbers the bridge and sparse-walk step as ``rung 3''; we keep the code's names.) Adding $23$ and $29$ jointly thins the $41\times23\times29=27{,}347$ classes to $4{,}431$ (a $6.17\times$ sparsification; shifts $k\le90$; the largest forced stack is $17\cdot19\cdot23\cdot29=215{,}441$, whence the $10^{11}$ validity threshold via $d^{2}<n$). The decisive design change from rung 2: \emph{the kills are certificates, not tactic cases.} A certificate $(i,k,ps)$ stores, for flat class index $i$, a shift $k$ and the full factorization $ps$ of the forced stack $d_{i,k}$, reusing decanus's \texttt{witnessOk} and \texttt{witness\_tau} for the $\tau(d)$ lower bound. The soundness lemma discharges the CRT divisibility (\texttt{Nat.modEq\_iff\_dvd'} per prime plus coprime stacking). A positional walker consumes the $27{,}347$-class flat grid: each class is either the next kill certificate or the next listed survivor, and the walker's soundness lemma yields ``every class is killed or in the survivor list''. Twenty-eight chunks of $1{,}000$ classes, one \texttt{decide} each ($\approx5$\,s). A rung-2-style tactic ladder over $27$k cases would have been infeasible; the certificate form built in about five minutes.
+
+Mod $23$ alone and mod $29$ alone give only $2.67\times$ and $2.16\times$; the joint rung is worth building and, per \S\ref{sec:limits}, is the last one that clearly is.
+
+\section{The sparse-walk certificate}\label{sec:walk}
+
+After the rungs, a candidate $n\in(10^{7},10^{13}]$ is a multiple of $360360$, say $n=360360\,j$ with $j\in[28,\,27{,}750{,}027]$, and above the respective thresholds lies in a surviving residue class. The \emph{grid filter} encodes which $j$ still need killing:
+\begin{itemize}
+\item $(10^{7},10^{12}]$: $\texttt{gridFilter}\,n = (n\le2.5\times10^{8})\ \lor\ \texttt{classOk}\,n$; below the rung-2 threshold every multiple of $360360$ needs a witness ($932$ extra points), above it only the $41$ classes.
+\item $(10^{12},10^{13}]$: $\texttt{gridFilter13}\,n = (n\le10^{11})\ \lor\ (\texttt{mask323.testBit}(n\bmod323)\ \land\ \texttt{mask27k.testBit}(\texttt{flatIdx}\,n))$; the $41$-pair and $4{,}431$-index survivor lists become two natural-number bitmask literals tested by \texttt{Nat.testBit} (GMP-accelerated shifts) instead of list scans. Bridge lemmas tie the masks to the proved rung theorems, so the headline derives $\texttt{gridFilter13}\,n=\texttt{true}$ for any candidate.
+\end{itemize}
+
+\paragraph{Kill witnesses.} A surviving grid point $n$ is killed by one $m=n-k$ with certified $\tau(m)\ge k+3$, in decanus's witness format (maximal prime powers $p<1024$, so primality of listed factors is eleven trial divisions). Because $n$ is a multiple of $360360$ its neighbourhood is divisor-rich and kills are cheap: over $(10^{9},10^{11}]$ the mean shift is $k=1.9$, the median $1$ ($52.8\%$ of points die at $k=1$, i.e.\ $\tau(n-1)\ge4$), the maximum $16$; over $(10^{12},10^{13}]$ the mean is $\approx1.75$ and the maximum $8$ on a sample. \texttt{killOk}\,$n\,k\,ps$ adds the explicit conjunct $0<k$: decanus's \texttt{witnessOk} alone admits offset $0$, which an \texttt{omega} countermodel caught during the soundness proof.
+
+\paragraph{The walker.} $\texttt{sparseOk}\ \textit{fuel}\ j\ ws:\mathrm{Bool}$ steps $j$ through a chunk's grid range; at each $j$ it evaluates the filter and, if the point survives, requires the next witness in $ws$ to kill exactly $360360\,j$, consuming it; non-surviving points consume nothing; leftovers are rejected. Its soundness lemma says a passing chunk kills every surviving grid point of its range. Each chunk is a single \texttt{by decide}.
+
+\paragraph{Counts.} $(10^{7},10^{12}]$: $352{,}823$ witnesses in $678$ chunks of $4{,}096$ grid indices ($8.3$\,MB). $(10^{12},10^{13}]$: $513{,}661$ witnesses in $1{,}525$ chunks of $16{,}384$ indices ($12.3$\,MB). Rung-4 kill certificates: $22{,}916$ ($0.76$\,MB). Total $\approx21$\,MB of generated Lean for the whole $10^{13}$ result, against $38.5$\,MB for decanus's in-repository $10^{8}$ chain and $\approx260$\,MB for its $10^{9}$ release asset.
+
+\paragraph{Composition.} $n\le10^{7}$ by decanus's \texttt{killed\_upto} (the in-repository $31$-chunk chain); $10^{7}<n\le10^{12}$ by the $10^{12}$ grid theorem; $10^{12}<n\le10^{13}$ by the fast-filter grid theorem together with the rung-4 and rung-2 theorems; each case closed through decanus's \texttt{not\_sup\_le\_of\_killed}.
+
+\section{Engineering at kernel scale}\label{sec:eng}
+
+\begin{itemize}
+\item \textbf{Chunk size from measured fuel cost.} Walk cost per grid point under the fast filter is $\approx2.5$\,ms isolated and $\approx7$\,ms under 8-way load; fuel-recursion cost is superlinear in chunk length ($\sim\textit{fuel}^{1.7}$: $16{,}384\to43$\,s, $32{,}768\to139$\,s). Chunks of $16{,}384$ keep the median at $\approx90$\,s and the $10^{13}$ walk at $48.8$ CPU-hours.
+\item \textbf{Drivers must be trees.} The $678$-branch linear \texttt{by\_cases} ladder for $10^{12}$ elaborated in $286$\,s. The $1{,}525$-branch ladder for $10^{13}$ reached $23$\,GB RSS at $21$ minutes and was killed: each negated branch hypothesis stays in the \texttt{omega} context, so the ladder is quadratic. The replacement emits one span lemma per chunk and an $11$-level balanced binary merge tree whose nodes each do one \texttt{by\_cases} with $O(1)$ context: $3{,}050$ small theorems, $56$\,s.
+\item \textbf{Survivor membership in $O(1)$.} Deciding membership of a flat index in a $4{,}431$-element list inside the kernel via Boolean sublist checks is quadratic and exceeded a ten-minute budget; per-survivor \texttt{List.mem\_append} embedding terms are $O(1)$.
+\item \textbf{\texttt{omega} modulus blow-up.} \texttt{omega}'s cost grows with the lcm of all modular facts in context; $(n-45)=14535\cdot((n-45)/14535)$ proves in $\approx10$\,s from exactly $\{n\bmod45=0,\ n\bmod17=11,\ n\bmod19=7\}$ and times out if $n\bmod2520=0$ is also present. Derive per-case minimal facts and clear the rest.
+\item \textbf{Generate, do not hand-write.} Every table is enumerated and verified in Python, then emitted as Lean; the Python verifier mirrors decanus's \texttt{witnessOk} semantics, and a coverage verifier checks exact one-witness-per-surviving-point alignment over the whole grid before any Lean is emitted.
+\end{itemize}
+
+\section{Verification record}
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Check & $10^{11}$ & $10^{12}$ & $10^{13}$\\
+\midrule
+Python coverage verifier (exact alignment, every witness replayed) & $35{,}803$ OK & $352{,}823$ OK & $513{,}661$ OK\\
+Lean build (4.30.0 / Mathlib v4.30.0) & exit 0 & exit 0, $9{,}194$ jobs & exit 0, $10{,}753$ jobs\\
+\verb|#print axioms| on headline & 3 standard & same & same\\
+\texttt{sorry} / \texttt{native\_decide} tokens & none & none & none\\
+Kernel time & $68\times35$\,s & $678$ chunks, median $80$\,s & $1{,}525$ chunks, $48.8$ CPU-h\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A two-layer axiom gate mirroring decanus's (a curated \verb|#print axioms| manifest of $19$ theorems plus a whole-library audit that recomputes the axiom closure of every theorem in every \texttt{Erdos647Sparse} module from the compiled environment) passes: $8{,}090$ theorems across $2{,}242$ modules, all within $\{\texttt{propext},\texttt{Classical.choice},\texttt{Quot.sound}\}$. Not yet done: a \texttt{lean4checker} replay of the modules and a second from-source build on independent hardware; every build so far ran once on one 8-core desktop, the trust status decanus assigns its own $10^{9}$ rung.
+
+\section{What this does and does not show}\label{sec:limits}
+
+\paragraph{Mathematical novelty: none claimed.} The modular ladder (Dutta--Alexeev), the shift condition (Kitamura) and the residue reduction (Hughes) are prior work; rung 2 is Hughes's reduction with the \texttt{native\_decide} trust removed, and rung 4 is its predictable extension. The problem is open and nothing here bears on whether a solution exists.
+
+\paragraph{Methodological point.} Certificate architecture, not compute, moved the kernel-checked frontier four orders of magnitude at lower artifact size. The two levers were (a) proving the structure inside the kernel so that the certificate covers only the sparse survivor grid, and (b) representing the structure itself (the rung kills) as data checked by \texttt{decide} under one generic soundness lemma, so that a rung costs minutes rather than a week of tactic engineering.
+
+\paragraph{Limits, quantified.} A sweep of the divisor-budget engine over sieve primes $17$ to $97$ and validity thresholds $10^{11}$ to $10^{21}$ (exact enumeration to $3\times10^{6}$ classes, Monte Carlo beyond; details in the repository appendix) gives:
+\begin{enumerate}
+\item Each added sieve prime kills a shrinking share of the remaining classes: $63\%$ at $23$, $56\%$ at $31$, $48\%$ at $37$, $44\%$ at $41$, $35\%$ at $61$, $22\%$ at $97$. A prime $p$ helps only at shifts $k\equiv c_p\pmod p$, and useful $k$ stay below about $170$.
+\item \emph{Full divisibility by any prime $p\ge17$ is never forced.} The class $c_{17}=16$, all other residues $0$, survives at every threshold: in it a sieve prime $q\ne17$ matches shift $k$ only if $q\mid k$, so the matched stack divides $k$, $d\le k$, and the budget $2\tau(d)\ge k+3$ would need $\tau(d)>d/2$, possible only for $d\in\{1,2,3,4,6\}$, none reachable with $k\equiv16\pmod{17}$. Hence $360360$ is the final forced modulus; all further sieving is residue thinning, never grid coarsening.
+\item Survivor-class counts grow $20$--$50\times$ per rung ($4.4\times10^{3}$ at rung 4, $2.6\times10^{7}$ at rung 7 with primes $\le41$); a kernel-checked literal above $\sim10^{8}$ entries is outside anything built so far, so rung 7 is the practical ceiling of an enumerable sieve, with density floor $f\approx2.5\times10^{-3}$.
+\item The present walk visits every multiple of $360360$ and costs $\propto T$ regardless of sieve depth; it walls at $10^{14}$--$10^{15}$. A \emph{period walk} that steps only through surviving residues per period is the one structural lever left and buys about two decades: $10^{17}$--$10^{18}$ at roughly one CPU-year.
+\item With any certifiable sieve, $10^{22}$ needs $\approx7\times10^{13}$ witnesses, i.e.\ $10^{3}$--$10^{4}$ CPU-years; even an uncertifiable $19$-prime sieve leaves $\ge4\times10^{11}$ witnesses. A kernel-checked $10^{22}$ therefore needs a different proof object---kills for whole arithmetic progressions at once, so that the witness count stops being $\propto T$---which is a research question, not an engineering one.
+\end{enumerate}
+
+\section*{Credit and provenance}
+
+Built on decanus~\cite{decanus} (Apache-2.0): witness format, \texttt{TauLower}/\texttt{Chain}/\texttt{Bridge} soundness, the $10^{7}$ chain, and the pinned formal-conjectures statement. Structural mathematics: Dutta--Alexeev, Kitamura, Hughes (erdosproblems.com forum, problem 647). Reference computations: Id\'en ($10^{12}$), Hughes ($6.2\times10^{17}$), bentrd ($9.2\times10^{18}$), veljjanoski ($10^{22}$).
+
+The Lean proofs, the Python generators and verifiers, and the first draft of this note were produced by an AI agent operated by Fjordmind Labs, working with compiler feedback under human direction; the author set the goals, reviewed the results, and is responsible for the claims. Nothing in the trust argument depends on how the proofs were written: the Lean kernel checks them the same way.
+
+\begin{thebibliography}{9}
+\bibitem{decanus} I.~Mian and S.~Siddique, \emph{A Kernel-Checked Exclusion Certificate for Erd\H{o}s Problem 647}, arXiv:2608.17880 (2026). Code: \url{https://github.com/ibrahimmian36/decanus}.
+\bibitem{bloom} T.~Bloom, \emph{Erd\H{o}s Problems}, problem 647, \url{https://www.erdosproblems.com/647}.
+\bibitem{fc} Google DeepMind, \emph{formal-conjectures}, \texttt{FormalConjectures/ErdosProblems/647.lean}, commit \texttt{c252a41}.
+\bibitem{mathlib} The Mathlib Community, \emph{Mathlib}, v4.30.0, \url{https://github.com/leanprover-community/mathlib4}.
+\end{thebibliography}
+
+\end{document}

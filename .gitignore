@@ -1,0 +1,14 @@
+.lake/
+__pycache__/
+*.pyc
+*.olean
+*.ilean
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.synctex.gz
+erdos647-sparse/scripts/*.jsonl
+erdos647-sparse/scripts/*.json
+erdos647-sparse/scripts/progress_*.json

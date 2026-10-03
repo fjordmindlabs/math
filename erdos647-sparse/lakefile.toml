@@ -1,0 +1,19 @@
+name = "erdos647sparse"
+version = "0.1.0"
+keywords = ["math"]
+defaultTargets = ["Erdos647Sparse"]
+
+[leanOptions]
+pp.unicode.fun = true
+relaxedAutoImplicit = false
+maxSynthPendingDepth = 3
+
+# Upstream kernel-checked chain, witness format and soundness lemmas
+# (Mian & Siddique, Apache-2.0). Pinned to the commit this library was built against.
+[[require]]
+name = "decanus"
+git = "https://github.com/ibrahimmian36/decanus"
+rev = "91d178dc36640fd1dec135ae6efa8fcefb0e0a21"
+
+[[lean_lib]]
+name = "Erdos647Sparse"
