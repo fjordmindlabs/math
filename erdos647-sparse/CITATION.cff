@@ -1,11 +1,11 @@
 cff-version: 1.2.0
 message: "If you use this certificate or the method, please cite it as below."
-title: "erdos647-sparse: a kernel-checked exclusion for Erdős Problem 647 to 10^13 via in-kernel modular rungs and a sparse witness walk"
+title: "erdos647-sparse: a kernel-checked exclusion for Erdős Problem 647 to 10^13 via a kernel-proved modular sieve and a sparse witness walk"
 authors:
   - family-names: "Tölö"
     given-names: "Eero"
-    affiliation: "Fjordmind Labs"
-    email: "labs@fjordmind.no"
+    affiliation: "Fjordmind Labs, Oslo, Norway"
+    email: "eero@fjordmind.no"
 type: software
 version: "0.1.0"
 date-released: "2026-10-03"
